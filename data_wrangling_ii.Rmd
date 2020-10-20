@@ -2,6 +2,107 @@
 title: "Data Wrangling II"
 author: "Linh Tran"
 date: "10/19/2020"
-output: github_document
+output: 
+  github_document:
+    toc: true
 ---
+
+# Reading Data From The Web
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(httr)
+```
+
+## Extracting tables
+ 
+```{r}
+url = "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads/2k15StateFiles/NSDUHsaeShortTermCHG2015.htm"
+drug_use_html = read_html(url)
+
+drug_use_html
+
+# Extracting the tables from HTML
+drug_use_html %>% 
+  html_node(css = "table")
+
+# Let's get the contents from the first list element
+table_marj =
+  drug_use_html %>% 
+  html_nodes(css = "table") %>% 
+  first() %>% 
+  html_table()      
+
+# Remove notes at the bottom of the table and convert to a tibble
+table_marj = 
+  drug_use_html %>% 
+  html_nodes(css = "table") %>% 
+  first() %>% 
+  html_table() %>% 
+  slice(-1) %>% 
+  as_tibble()
+table_marj
+```
+
+## CSS Selectors
+
+```{r}
+swm_html = 
+  read_html("https://www.imdb.com/list/ls070150896/")  #the info isn't stored in a table, so we're going to isolate the CSS selector for elements we care about
+
+# For each element, I'll use the CSS elector in html_nodes() to extract the relevant HTML code, and convert it to text
+title_vec =
+  swm_html %>% 
+  html_nodes(".lister-item-header a") %>% 
+  html_text()
+
+gross_rev_vec =
+  swm_html %>% 
+  html_nodes(".text-small:nth-child(7) span:nth-child(5)") %>% 
+  html_text()
+
+runtime_vec = 
+  swm_html %>% 
+  html_nodes(".runtime") %>% 
+  html_text()
+
+swm_df = 
+  tibble(
+    title = title_vec,
+    rev = gross_rev_vec,
+    runtime = runtime_vec
+  )
+```
+
+## Using an API
+
+```{r}
+# First import dataset for annual water consumption in NYC as csv and parse it
+nyc_water = GET("https://data.cityofnewyork.us/resource/ia2d-e54m.csv") %>% 
+  content("parsed")
+
+# Can also import this dataset as a JSON file
+nyc_water = 
+  GET("https://data.cityofnewyork.us/resource/ia2d-e54m.json") %>% 
+  content("text") %>% 
+  jsonlite::fromJSON() %>% 
+  as_tibble()
+
+# Behavioral Risk Factor Surveillance System dataset
+brfss_smart2010 =
+  GET("https://chronicdata.cdc.gov/resource/acme-vg9e.csv",
+      query = list("$limit" = 5000)) %>% 
+  content("parsed")
+
+# Things could get more complicated
+poke = 
+  GET("http://pokeapi.co/api/v2/pokemon/1") %>% 
+  content()
+poke$name
+poke$height
+poke$abilities
+
+# It wouldn't be terrible to just download the CSV, document where it came from carefully, and move on. APIs are more helpful when the full dataset is complex and you only need pieces, or when the data are updated regularly
+```
 
